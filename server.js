@@ -21,16 +21,16 @@ function shuffle(array) {
 
 // Endpoint catalogo per Stremio
 app.get('/catalog/movie/mdblist-random.json', (req, res) => {
-    const shuffledMovies = shuffle([...movies]); // copia e mescola
+    const shuffledMovies = shuffle([...movies]);
     res.json({
-        id: "mdblist-random",          // ID del catalogo
-        name: "Frusciante 120+",   // ← qui puoi mettere il nome che vuoi
-        type: "movie",                 // tipo di contenuto
-        metas: shuffledMovies           // lista mescolata
+        id: "mdblist-random",
+        name: "Frusciante 120+",
+        type: "movie",
+        metas: shuffledMovies
     });
 });
 
-// Endpoint info singolo film (opzionale)
+// Endpoint info singolo film
 app.get('/meta/movie/:id.json', (req, res) => {
     const movie = movies.find(m => m.id === req.params.id);
     if (movie) {
