@@ -1,10 +1,9 @@
-
 import express from 'express';
 import fetch from 'node-fetch';
 import cors from 'cors';
 
 const app = express();
-const port = process.env.PORT || 10000; // Render fornisce la porta tramite env
+const port = process.env.PORT || 10000;
 
 app.use(cors()); // abilita CORS
 
@@ -29,7 +28,8 @@ app.get('/manifest.json', (req, res) => {
       {
         type: 'movie',
         id: 'mdblist-random',
-        name: 'MDBList Random'
+        name: 'MDBList Random',
+        extra: []
       }
     ]
   });
@@ -41,6 +41,7 @@ app.get('/catalog/:type/:id.json', async (req, res) => {
     const response = await fetch(MDLIST_URL);
     const data = await response.json();
 
+    // Mischia i film ogni volta
     const shuffled = shuffle(data);
 
     const metas = shuffled.map(item => ({
