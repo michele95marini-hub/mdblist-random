@@ -1,61 +1,46 @@
-import express from 'express';
-import fetch from 'node-fetch';
-import cors from 'cors';
 
+const express = require('express');
+const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // abilita CORS
+// Abilita CORS
+app.use(cors());
 
-// URL della tua lista MDBList
-const MDLIST_URL = 'https://mdblist.com/lists/mulf95/frusciante-120min/json';
+// Lista film (assicurati che il file si chiami movies.json)
+const movies = require('./movies.json').metas;
 
-// Funzione per mischiare un array
-function shuffle(arr) {
-  return arr.sort(() => Math.random() - 0.5);
+// Funzione per mescolare (Fisher-Yates)
+function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
 }
 
-// Endpoint manifest di Stremio
-app.get('/manifest.json', (req, res) => {
-  res.json({
-    id: 'mdblist-random',
-    version: '1.0.0',
-    name: 'MDBList Random',
-    description: 'Lista MDBList mescolata casualmente',
-    resources: ['catalog'],
-    types: ['movie','series'],
-    catalogs: [
-      {
-        type: 'movie',
-        id: 'mdblist-random',
-        name: 'MDBList Random',
-        extra: []
-      }
-    ]
-  });
+// Endpoint catalogo per Stremio
+app.get('/catalog/movie/mdblist-random.json', (req, res) => {
+    const shuffledMovies = shuffle([...movies]); // copia e mescola
+    res.json({
+        id: "mdblist-random",          // ID del catalogo
+        name: "Frusciante 120+",   // ← qui puoi mettere il nome che vuoi
+        type: "movie",                 // tipo di contenuto
+        metas: shuffledMovies           // lista mescolata
+    });
 });
 
-// Endpoint catalogo Stremio
-app.get('/catalog/:type/:id.json', async (req, res) => {
-  try {
-    const response = await fetch(MDLIST_URL);
-    const data = await response.json();
-
-    // Mischia i film ogni volta
-    const shuffled = shuffle(data);
-
-    const metas = shuffled.map(item => ({
-      id: String(item.imdb_id || item.tmdb_id || item.trakt_id),
-      type: req.params.type,
-      name: item.title,
-      poster: item.poster,
-      year: item.year
-    }));
-
-    res.json({ metas });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Endpoint info singolo film (opzionale)
+app.get('/meta/movie/:id.json', (req, res) => {
+    const movie = movies.find(m => m.id === req.params.id);
+    if (movie) {
+        res.json({ meta: movie });
+    } else {
+        res.status(404).json({ error: 'Movie not found' });
+    }
 });
 
-app.listen(port, () => console.log(`Server in ascolto sulla porta ${port}`));
+// Avvia server
+app.listen(PORT, () => {
+    console.log(`Server in ascolto su http://localhost:${PORT}`);
+});
