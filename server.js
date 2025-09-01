@@ -5,11 +5,9 @@ import fetch from "node-fetch";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// URL MDBList (formato corretto con /json)
 const LIST_URL_1 = process.env.LIST_URL_1 || "https://mdblist.com/lists/mulf95/frusciante-120min/json";
 const LIST_URL_2 = process.env.LIST_URL_2 || "https://mdblist.com/lists/mulf95/frusciante-120min-ixf9w5z5br/json";
 
-// Cache 3 ore
 const CACHE_MS = 3 * 60 * 60 * 1000;
 const cache = {
   one: { metas: [], ts: 0, src: LIST_URL_1 },
@@ -30,16 +28,17 @@ function shuffle(arr) {
 
 // Normalizza item → meta Stremio
 function toMeta(item) {
+  // MDblist può usare vari nomi campo
   const id = String(
     item.imdb_id || item.imdbId || item.tmdb_id || item.trakt_id || item.id || ""
   ).trim();
 
+  // titolo può comparire come title/name/original_title/nome
   const name =
-    item.title || item.name || item.original_title || item.originalName || "Untitled";
+    item.title || item.name || item.original_title || item.originalName || item.nome || "Untitled";
 
-  const posterRaw =
-    item.poster || item.poster_path || item.image || item.thumbnail || null;
-
+  // poster può essere url o path TMDB
+  const posterRaw = item.poster || item.poster_path || item.image || item.thumbnail || null;
   const poster =
     typeof posterRaw === "string"
       ? (posterRaw.startsWith("http")
@@ -50,15 +49,25 @@ function toMeta(item) {
   const year =
     item.year || (item.release_date ? String(item.release_date).slice(0, 4) : undefined);
 
-  // Se manca l'id, ripiega sul nome per evitare di perdere l’item
   const safeId = id || name;
 
   return {
     id: safeId,
-    type: "movie",
+    type: "movie", // forza sempre "movie" (niente "film")
     name,
     poster,
     year: year ? Number(year) : undefined,
+  };
+}
+
+// Mantiene solo le chiavi consentite
+function pickMetaFields(m) {
+  return {
+    id: m.id,
+    type: "movie",
+    name: m.name,
+    poster: m.poster,
+    year: m.year,
   };
 }
 
@@ -70,17 +79,8 @@ async function fetchJsonSafe(url) {
     },
   });
   const text = await res.text();
-
-  // Se è HTML, non è JSON
-  if (/^\s*<(?:!DOCTYPE|html)\b/i.test(text)) {
-    throw new Error(`Non-JSON (HTML) da ${url}`);
-  }
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("JSON parse error da:", url, "Primi 200 char:", text.slice(0, 200));
-    throw e;
-  }
+  if (/^\s*<(?:!DOCTYPE|html)\b/i.test(text)) throw new Error(`Non-JSON (HTML) da ${url}`);
+  return JSON.parse(text);
 }
 
 async function loadList(which) {
@@ -88,18 +88,16 @@ async function loadList(which) {
   const now = Date.now();
 
   if (!slot.metas.length || now - slot.ts > CACHE_MS) {
-    console.log(`[loadList] fetch ${which} → ${slot.src}`);
     const data = await fetchJsonSafe(slot.src);
     const raw = Array.isArray(data) ? data : (data.metas || data.items || data.results || []);
-    const metas = raw.map(toMeta).filter(m => m && m.id && m.name);
+    const metas = raw.map(toMeta).filter(m => m.id && m.name).map(pickMetaFields);
     slot.metas = shuffle(metas);
     slot.ts = now;
-    console.log(`[loadList] ${which}: ${slot.metas.length} titoli in cache`);
   }
   return slot.metas;
 }
 
-// Manifest corretto (type sempre "movie")
+// Manifest
 app.get("/manifest.json", (_req, res) => {
   res.json({
     id: "mdblist-random",
@@ -115,48 +113,29 @@ app.get("/manifest.json", (_req, res) => {
   });
 });
 
-// Cataloghi (ritornano SEMPRE { metas: [...] })
+// Cataloghi
 app.get("/catalog/movie/frusciante-120.json", async (_req, res) => {
   try {
     const metas = await loadList("one");
     res.json({ metas });
   } catch (e) {
-    console.error("Catalog one error:", e.message);
-    res.status(200).json({ metas: [] }); // mantenere forma corretta
+    res.status(200).json({ metas: [] });
   }
 });
-
 app.get("/catalog/movie/frusciante-120plus.json", async (_req, res) => {
   try {
     const metas = await loadList("two");
     res.json({ metas });
   } catch (e) {
-    console.error("Catalog two error:", e.message);
-    res.status(200).json({ metas: [] }); // mantenere forma corretta
+    res.status(200).json({ metas: [] });
   }
 });
 
-// Endpoint di debug
-app.get("/health", (_req, res) => {
-  res.json({
-    one: { count: cache.one.metas.length, cachedAt: cache.one.ts },
-    two: { count: cache.two.metas.length, cachedAt: cache.two.ts },
-  });
-});
-
-app.get("/debug/sample", async (_req, res) => {
-  try {
-    const one = await loadList("one");
-    const two = await loadList("two");
-    res.json({
-      oneCount: one.length,
-      twoCount: two.length,
-      oneSample: one.slice(0, 3),
-      twoSample: two.slice(0, 3),
-    });
-  } catch (e) {
-    res.status(500).json({ error: String(e) });
-  }
+// Admin: svuota cache manualmente (facile per test)
+app.get("/purge", (_req, res) => {
+  cache.one = { metas: [], ts: 0, src: LIST_URL_1 };
+  cache.two = { metas: [], ts: 0, src: LIST_URL_2 };
+  res.json({ ok: true, message: "Cache svuotata" });
 });
 
 app.listen(PORT, () => console.log(`Server attivo su :${PORT}`));
