@@ -5,8 +5,8 @@ import fetch from "node-fetch";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const LIST_URL_1 = process.env.LIST_URL_1 || "https://mdblist.com/lists/mulf95/frusciante-120min.json";
-const LIST_URL_2 = process.env.LIST_URL_2 || "https://mdblist.com/lists/mulf95/frusciante-120min-ixf9w5z5br.json";
+const LIST_URL_1 = process.env.LIST_URL_1 || "https://mdblist.com/lists/mulf95/frusciante-120min/json";
+const LIST_URL_2 = process.env.LIST_URL_2 || "https://mdblist.com/lists/mulf95/frusciante-120min-ixf9w5z5br/json";
 
 const CACHE_MS = 3 * 60 * 60 * 1000;
 const cache = {
@@ -103,9 +103,9 @@ app.get("/manifest.json", (req, res) => {
     resources: ["catalog"],
     types: ["movie"],
     catalogs: [
-      { type: "movie", id: "frusciante-120", name: "Frusciante -120min" },
-      { type: "movie", id: "frusciante-120plus", name: "Frusciante +120min" },
-    ],
+      { type: "movie", id: "frusciante-120",     name: "Frusciante -120min" },
+      { type: "movie", id: "frusciante-120plus", name: "Frusciante +120min" }
+    ]
   });
 });
 
